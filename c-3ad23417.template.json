@@ -1,0 +1,460 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "The AWS CloudFormation template creates all the required resources for creating a AWS  job in the account",
+    "Parameters": {
+        "ChallengeIdParameter": {
+            "Type": "String",
+            "Description": "ChallengeId of the challenge for which the stack is being provisioned."
+        },
+        "AttemptIdParameter": {
+            "Type": "String",
+            "Description": "AttemptID of the attempt for which the stack is being provisioned.",
+            "Default": "Testinglambda"
+        },
+        "UserAliasParameter": {
+            "Type": "String",
+            "Description": "Alias of the user for whom the stack is being provisioned."
+        },
+        "Route53HostedZoneIDParameter": {
+            "Type": "String",
+            "Description": "Hosted Zone ID of the zone where you can create sub-domains"
+        },
+        "AcmCertARNParameter": {
+            "Type": "String",
+            "Description": "ARN of the wildcard ACM cert which can be used with the sub-domain"
+        },
+        "S3BucketNameParameter": {
+            "Type": "String",
+            "Description": "Name of the S3 bucket which you should use to get the inputs you provided on your challenge sim:"
+        },
+        "S3PrefixNameParameter": {
+            "Type": "String",
+            "Description": "Folder in the S3 bucket where you can read the inputs from. You will need to append 'challenge-id/' to this prefix to fetch your files.:"
+        },
+        "RegionParameter": {
+            "Type": "String",
+            "Description": "Region where this template will be run and resources will be provisioned"
+        },
+        "ConsoleAccessPasswordParameter": {
+            "Type": "String",
+            "Description": "Password for the user who wishes to access the console. Default is myP@ssW0rd.",
+            "Default": "myP@ssW0rd"
+        },
+        "DomainNameParameter": {
+            "Type": "String",
+            "Description": "Only accept this parameter as input if your scenario requires a domain name. The parameter will create a hosted zone for the domain name and will provide the domain name in this parameter along with the hosted zone ID in Route53HostedZoneIDParameter"
+        },
+        "DBName": {
+            "Type": "String",
+            "Default": "mydb"
+        },
+        "DBUsername": {
+            "Type": "String",
+            "Default": "admin"
+        },
+        "DBPassword": {
+            "Type": "String",
+            "Default": "mydb1234",
+            "NoEcho": true
+        },
+        "MinCapacity": {
+            "Type": "Number",
+            "Default": "0.5",
+            "Description": "Minimum ACU (0.5 to 128)"
+        },
+        "MaxCapacity": {
+            "Type": "Number",
+            "Default": "1",
+            "Description": "Maximum ACU (0.5 to 128)"
+        },
+        "DailyRetentionDays": {
+            "Type": "Number",
+            "Default": 7,
+            "Description": "Number of days to retain daily backups"
+        },
+        "WeeklyRetentionDays": {
+            "Type": "Number",
+            "Default": 30,
+            "Description": "Number of days to retain weekly backups"
+        },
+        "AuroraClusterName": {
+            "Type": "String",
+            "Default": "mydb",
+            "Description": "Name of the Aurora cluster"
+        }
+    },
+    "Resources": {
+        "ConsoleUser": {
+            "Type": "AWS::IAM::User",
+            "Properties": {
+                "Path": "/",
+                "LoginProfile": {
+                    "Password": "aC:!eW?m<7U3CFs5",
+                    "PasswordResetRequired": "false"
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AWSBackupFullAccess",
+                    "arn:aws:iam::aws:policy/AmazonRDSFullAccess"
+                ],
+                "Policies": [{
+                        "PolicyName": "backupuserpolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [{
+                                    "Sid": "VisualEditor0",
+                                    "Effect": "Allow",
+                                    "Action": "iam:AttachRolePolicy",
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "ArnEquals": {
+                                            "iam:PolicyARN": {
+                                                "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:policy/*backuppolicy*"
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "Sid": "VisualEditor1",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:GetPolicyVersion",
+                                        "iam:CreateServiceSpecificCredential",
+                                        "iam:ListRoleTags",
+                                        "iam:UntagRole",
+                                        "iam:TagRole",
+                                        "iam:DeleteRolePermissionsBoundary",
+                                        "iam:AddRoleToInstanceProfile",
+                                        "iam:ListInstanceProfilesForRole",
+                                        "iam:DetachRolePolicy",
+                                        "iam:DeleteRolePolicy",
+                                        "iam:ListAttachedRolePolicies",
+                                        "iam:DetachGroupPolicy",
+                                        "iam:ListPolicyTags",
+                                        "iam:ListRolePolicies",
+                                        "iam:CreatePolicyVersion",
+                                        "iam:ListPolicies",
+                                        "iam:GetRole",
+                                        "iam:DeleteAccountPasswordPolicy",
+                                        "iam:GetInstanceProfile",
+                                        "iam:GetPolicy",
+                                        "iam:ListRoles",
+                                        "iam:UpdateRoleDescription",
+                                        "iam:ListInstanceProfiles",
+                                        "iam:TagPolicy",
+                                        "iam:ListPolicyVersions",
+                                        "iam:UntagPolicy",
+                                        "iam:UpdateRole",
+                                        "iam:GetGroupPolicy",
+                                        "iam:DeleteGroupPolicy",
+                                        "iam:GetRolePolicy",
+                                        "iam:DeletePolicyVersion",
+                                        "iam:SetDefaultPolicyVersion",
+                                        "iam:PutRolePolicy",
+                                        "rds:ModifyDBCluster",
+                                        "rds:AddTagsToResource",
+                                        "rds:ModifyDBInstance",
+
+                                        "rds:ListTagsForResource",
+
+
+
+                                        "cloudwatch:GetMetricData",
+                                        "kms:DescribeKey"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Sid": "VisualEditor2",
+                                    "Effect": "Allow",
+                                    "Action": "iam:PassRole",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/*backuprole*"
+                                    }
+                                },
+                                {
+                                    "Effect": "Deny",
+                                    "Action": "iam:PassRole",
+                                    "Resource": [
+                                        "arn:aws:iam::*:role/*AwsBackup*",
+                                        "arn:aws:iam::*:role/*AWSBackup*"
+                                    ],
+                                    "Condition": {
+                                        "StringLike": {
+                                            "iam:PassedToService": "backup.amazonaws.com"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+
+                ]
+            }
+        },
+        "backupkey": {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "KeyPolicy": {
+                    "Version": "2012-10-17",
+                    "Id": "backupkey",
+                    "Statement": [{
+                            "Sid": "Allow access through Backup for all principals in the account that are authorized to use Backup Storage",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "*"
+                            },
+                            "Action": [
+                                "kms:CreateGrant",
+                                "kms:Decrypt",
+                                "kms:GenerateDataKey*"
+                            ],
+                            "Resource": "*",
+                            "Condition": {
+                                "StringEquals": {
+                                    "kms:CallerAccount": {
+                                        "Fn::Sub": "${AWS::AccountId}"
+                                    },
+                                    "kms:ViaService": {
+                                        "Fn::Sub": "backup.${AWS::Region}.amazonaws.com"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Sid": "Allow direct access to key metadata to the account",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+                                }
+                            },
+                            "Action": "kms:*",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+
+
+        "ServerlessCluster": {
+            "Type": "AWS::RDS::DBCluster",
+            "Properties": {
+                "Engine": "aurora-mysql",
+                "EngineVersion": "8.0.mysql_aurora.3.04.1",
+                "EngineMode": "provisioned",
+                "ServerlessV2ScalingConfiguration": {
+                    "MinCapacity": {
+                        "Ref": "MinCapacity"
+                    },
+                    "MaxCapacity": {
+                        "Ref": "MaxCapacity"
+                    }
+                },
+                "DatabaseName": {
+                    "Ref": "DBName"
+                },
+                "MasterUsername": {
+                    "Ref": "DBUsername"
+                },
+                "MasterUserPassword": {
+                    "Ref": "DBPassword"
+                },
+                "BackupRetentionPeriod": 7,
+                "PreferredBackupWindow": "01:00-03:00",
+                "StorageEncrypted": true,
+                "DeletionProtection": false,
+                "Tags": [{
+                        "Key": "backup-policy",
+                        "Value": "daily0"
+                    },
+                    {
+                        "Key": "backup-retention",
+                        "Value": "7-days"
+                    },
+                    {
+                        "Key": "backup-owner",
+                        "Value": "dba-team"
+                    }
+                ]
+            }
+        },
+        "backupvault": {
+            "Type": "AWS::Backup::BackupVault",
+                              "DependsOn": ["backupkey", "ServerlessCluster"],
+
+            "Properties": {
+                "BackupVaultName": "backupvault",
+                "EncryptionKeyArn": {
+                    "Fn::GetAtt": ["backupkey", "Arn"]
+                }
+            }
+        },
+        "backuprole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "ManagedPolicyArns": [
+                        "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup",
+                        "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores"
+                    ],
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "backup.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }]
+                }
+            }
+        },
+
+        "BackupPlan": {
+            "Type": "AWS::Backup::BackupPlan",
+                  "DependsOn": "ServerlessCluster",
+
+            "Properties": {
+                "BackupPlan": {
+                    "BackupPlanName": {
+                        "Fn::Sub": "${AWS::StackName}-backup-plan"
+                    },
+                    "BackupPlanRule": [{
+                            "RuleName": "DailyBackups",
+                            "TargetBackupVault": {
+                                "Ref": "backupvault"
+                            },
+                            "ScheduleExpression": "cron(0 1 ? * * *)",
+                            "StartWindowMinutes": 60,
+                            "CompletionWindowMinutes": 120,
+                            "Lifecycle": {
+                                "DeleteAfterDays": {
+                                    "Ref": "DailyRetentionDays"
+                                }
+                            },
+                            "EnableContinuousBackup": false
+                        },
+                        {
+                            "RuleName": "WeeklyBackups",
+                            "TargetBackupVault": {
+                                "Ref": "backupvault"
+                            },
+                            "ScheduleExpression": "cron(0 1 ? * SUN *)",
+                            "StartWindowMinutes": 60,
+                            "CompletionWindowMinutes": 120,
+                            "Lifecycle": {
+                                "DeleteAfterDays": {
+                                    "Ref": "WeeklyRetentionDays"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+
+        "BackupSelectionByTags": {
+            "Type": "AWS::Backup::BackupSelection",
+                  "DependsOn": ["BackupPlan", "ServerlessCluster"],
+
+            "Properties": {
+                "BackupPlanId": {
+                    "Ref": "BackupPlan"
+                },
+                "BackupSelection": {
+                    "SelectionName": "BackupSelectionByTags",
+                    "IamRoleArn": {
+                        "Fn::GetAtt": ["backuprole", "Arn"]
+                    },
+                    "ListOfTags": [{
+                        "ConditionType": "STRINGEQUALS",
+                        "ConditionKey": "backup-policy",
+                        "ConditionValue": "daily"
+                    }]
+                }
+            }
+        },
+
+        "BackupSelectionByResource": {
+            "Type": "AWS::Backup::BackupSelection",
+                  "DependsOn": ["BackupPlan", "ServerlessCluster"],
+
+            "Properties": {
+                "BackupPlanId": {
+                    "Ref": "BackupPlan"
+                },
+                "BackupSelection": {
+                    "SelectionName": "BackupSelectionByResource",
+                    "IamRoleArn": {
+                        "Fn::GetAtt": ["backuprole", "Arn"]
+                    },
+                    "Resources": [
+                      { "Fn::Sub": "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:${ServerlessCluster}"}
+                    ]
+                }
+            }
+        }
+    },
+
+    "Outputs": {
+
+        "ConsoleUserName": {
+            "Description": "Console Login url for S3",
+            "Value": {
+                "Ref": "ConsoleUser"
+            }
+        },
+        "ConsoleAccessURL": {
+            "Description": "Console Login url for S3",
+            "Value": {
+                "Fn::Sub": "https://${AWS::AccountId}.signin.aws.amazon.com/console"
+            }
+        },
+        "ConsolUserPassword": {
+            "Description": "ConsolUser Password",
+            "Value": "aC:!eW?m<7U3CFs5"
+        },
+        "BackupPlanId": {
+            "Description": "Backup Plan ID",
+            "Value": {
+                "Ref": "BackupPlan"
+            }
+        },
+        "BackupPlanName": {
+      "Description": "Backup Plan Name",
+      "Value": {"Fn::Sub": "${AWS::StackName}-backup-plan"}
+    },
+        "BackupRole": {
+            "Description": "Backup role",
+            "Value": {
+                "Ref": "backuprole"
+            }
+        },
+        "BackupVault": {
+            "Description": "BackupVault Name",
+            "Value": {
+                "Ref": "backupvault"
+            }
+        },
+
+        "KMSKey": {
+            "Description": "KMS key of the vault",
+            "Value": {
+                "Ref": "backupkey"
+            }
+        },
+        "ClusterEndpoint": {
+            "Description": "Serverless Cluster Endpoint",
+            "Value": {
+                "Fn::GetAtt": ["ServerlessCluster", "Endpoint.Address"]
+            }
+        },
+        "ClusterArn": {
+            "Description": "ARN for database to backup",
+            "Value": {
+"Fn::Sub": "arn:aws:rds:${AWS::Region}:${AWS::AccountId}:cluster:${ServerlessCluster}"            }
+        }
+
+    }
+}
